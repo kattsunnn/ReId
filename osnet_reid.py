@@ -17,14 +17,13 @@ class OSNetReID:
                 device=device
             )
 
-# Todo: esp, min_sampleを引数で設定できるようにする
     @classmethod
     def cluster_imgs(cls, img_paths, eps=0.3, min_samples=2):
         cls._init_extractor()
         feats = cls.extractor(img_paths) 
         dist_mat = 1 - cosine_similarity(feats) # コサイン類似度 1=完全一致, 0=無関係, -1=正反対. DBSCANでは距離を扱うため、1-コサイン類似度で似ているほど小さな値になるようにしている
         dist_mat = np.clip(dist_mat, 0, None) 
-        cluster = DBSCAN(esp=eps, min_samples=min_samples, metric='precomputed')
+        cluster = DBSCAN(eps=eps, min_samples=min_samples, metric='precomputed')
         labels = cluster.fit_predict(dist_mat)
         groups = defaultdict(list)
         for path, label in zip(img_paths, labels):
