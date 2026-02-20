@@ -1,12 +1,10 @@
 import torch
 from torchreid.reid.utils.feature_extractor import FeatureExtractor
 import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.cluster import DBSCAN
 from collections import defaultdict
 from sklearn.neighbors import NearestNeighbors
 import matplotlib.pyplot as plt
-from kneed import KneeLocator
 
 class OSNetReID:
     extractor = None
