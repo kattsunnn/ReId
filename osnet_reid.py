@@ -4,9 +4,35 @@ import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.cluster import DBSCAN
 from collections import defaultdict
+from sklearn.neighbors import NearestNeighbors
+import matplotlib.pyplot as plt
+from kneed import KneeLocator
 
 class OSNetReID:
     extractor = None
+
+    @classmethod
+    def find_optimal_eps(cls, feats_norm, k=2):
+        neigh = NearestNeighbors(n_neighbors=k, metric='euclidean')
+        neigh.fit(feats_norm)
+        distances, _ = neigh.kneighbors(feats_norm)
+        
+        k_distances = np.sort(distances[:, k-1])
+
+        acc = np.diff(k_distances, n=2)
+        max_idx = np.argmax(np.abs(acc))
+        eps = k_distances[max_idx+1]
+        # print(eps)
+        # plt.figure(figsize=(10, 6))
+        # plt.plot(k_distances, marker='o', markersize=2, linestyle='-')
+        # plt.axhline(y=eps, color='r', linestyle='--', label='Candidate EPS (e.g. 0.7)') # 目安線
+        # plt.title(f"k-distance Graph (k={k}) - DBSCAN Parameter Selection")
+        # plt.xlabel("Points sorted by distance")
+        # plt.ylabel(f"{k}-th Nearest Neighbor Distance (L2)")
+        # plt.grid(True)
+        # plt.legend()
+        # plt.show()
+        return eps
 
     @classmethod
     def _init_extractor(cls):
@@ -18,13 +44,15 @@ class OSNetReID:
             )
 
     @classmethod
-    def cluster_imgs(cls, img_paths, eps=0.3, min_samples=2):
+    def cluster_imgs(cls, img_paths, min_samples=2):
         cls._init_extractor()
-        feats = cls.extractor(img_paths) 
-        dist_mat = 1 - cosine_similarity(feats) # コサイン類似度 1=完全一致, 0=無関係, -1=正反対. DBSCANでは距離を扱うため、1-コサイン類似度で似ているほど小さな値になるようにしている
-        dist_mat = np.clip(dist_mat, 0, None) 
-        cluster = DBSCAN(eps=eps, min_samples=min_samples, metric='precomputed')
-        labels = cluster.fit_predict(dist_mat)
+        feats = np.asarray(cls.extractor(img_paths))
+        norms = np.linalg.norm(feats, axis=1, keepdims=True)
+        norms = np.maximum(norms, 1e-12)
+        feats_normalized = feats / norms
+        eps = cls.find_optimal_eps(feats_normalized)
+        cluster = DBSCAN(eps=eps, min_samples=min_samples, metric='euclidean')
+        labels = cluster.fit_predict(feats_normalized)
         groups = defaultdict(list)
         for path, label in zip(img_paths, labels):
             groups[label].append(path)
@@ -46,4 +74,3 @@ if __name__ == "__main__":
         print(f"Cluster :{label}")
         for path in paths:
             print(f"  {path}")
-
