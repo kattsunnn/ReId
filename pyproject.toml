@@ -25,3 +25,8 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/person_re_identification"]
+
+[dependency-groups]
+dev = [
+    "matplotlib>=3.10.8",
+]

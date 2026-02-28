@@ -20,7 +20,8 @@ class OSNet:
         acc = np.diff(k_distances, n=2)
         max_idx = np.argmax(np.abs(acc))
         eps = k_distances[max_idx+1]
-        # print(eps)
+        # 谷を直接epsに設定すると，谷部分に相当する点がクラスタに含まれなくなってしまうため，小さな値を足し合わせる
+        eps = eps + 1e-5
         # plt.figure(figsize=(10, 6))
         # plt.plot(k_distances, marker='o', markersize=2, linestyle='-')
         # plt.axhline(y=eps, color='r', linestyle='--', label='Candidate EPS (e.g. 0.7)') # 目安線
@@ -42,17 +43,20 @@ class OSNet:
             )
 
     @classmethod
-    def cluster_imgs(cls, img_paths, min_samples=2):
+    def cluster_imgs_with_auto_eps(cls, img_paths, min_samples=2):
         cls._init_extractor()
         feats = np.asarray(cls.extractor(img_paths))
         norms = np.linalg.norm(feats, axis=1, keepdims=True)
         norms = np.maximum(norms, 1e-12)
         feats_normalized = feats / norms
         eps = cls.find_optimal_eps(feats_normalized)
+        # 類似画像のみの場合，epsが極端に小さくなるため，最小値を設ける
+        if eps < 0.5:
+            eps = 0.5
         cluster = DBSCAN(eps=eps, min_samples=min_samples, metric='euclidean')
         labels = cluster.fit_predict(feats_normalized)
         groups = defaultdict(list)
         for path, label in zip(img_paths, labels):
             groups[label].append(path)
-        return groups
+        return groups, eps
     
