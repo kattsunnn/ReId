@@ -4,9 +4,9 @@ import numpy as np
 from sklearn.cluster import DBSCAN
 from collections import defaultdict
 from sklearn.neighbors import NearestNeighbors
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
-class OSNetReID:
+class OSNet:
     extractor = None
 
     @classmethod
@@ -56,19 +56,3 @@ class OSNetReID:
             groups[label].append(path)
         return groups
     
-if __name__ == "__main__":
-
-    import glob
-    import os
-    import sys
-    from img_utils.img_utils import load_img_paths_from_dir
-
-    input_dir = sys.argv[1]
-    img_paths = load_img_paths_from_dir(input_dir)
-
-    groups = OSNetReID.cluster_imgs(img_paths)
-
-    for label, paths in groups.items():
-        print(f"Cluster :{label}")
-        for path in paths:
-            print(f"  {path}")
