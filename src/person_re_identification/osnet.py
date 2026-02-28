@@ -50,9 +50,6 @@ class OSNet:
         norms = np.maximum(norms, 1e-12)
         feats_normalized = feats / norms
         eps = cls.find_optimal_eps(feats_normalized)
-        # 類似画像のみの場合，epsが極端に小さくなるため，最小値を設ける
-        if eps < 0.5:
-            eps = 0.5
         cluster = DBSCAN(eps=eps, min_samples=min_samples, metric='euclidean')
         labels = cluster.fit_predict(feats_normalized)
         groups = defaultdict(list)
