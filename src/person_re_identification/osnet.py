@@ -11,10 +11,9 @@ class OSNet:
 
     @classmethod
     def find_optimal_eps(cls, feats_norm, k=2):
-        neigh = NearestNeighbors(n_neighbors=k, metric='euclidean')
+        neigh = NearestNeighbors(n_neighbors=k+1, metric='euclidean') # 自分自身を含むためk+1
         neigh.fit(feats_norm)
         distances, _ = neigh.kneighbors(feats_norm)
-        
         k_distances = np.sort(distances[:, k-1])
 
         acc = np.diff(k_distances, n=2)
