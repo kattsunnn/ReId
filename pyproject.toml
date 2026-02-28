@@ -9,7 +9,7 @@ authors = [
 
 requires-python = ">=3.12"
 dependencies = [
-    "gdow",
+    "gdown",
     "numpy",
     "pillow",
     "scikit-learn",
