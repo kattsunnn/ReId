@@ -1,7 +1,9 @@
+from networkx.algorithms import shortest_paths
 import torch
 from torchreid.reid.utils.feature_extractor import FeatureExtractor
 import numpy as np
 from sklearn.cluster import DBSCAN
+from sklearn.metrics.pairwise import euclidean_distances
 from collections import defaultdict
 from sklearn.neighbors import NearestNeighbors
 from scipy.spatial.distance import pdist, squareform
@@ -23,7 +25,7 @@ class OSNet:
             )
 
     @classmethod
-    def cluster_imgs_with_auto_eps(cls, img_paths, min_samples=2):
+    def dbscan_by_auto_eps(cls, img_paths, min_samples=2):
         cls._init_extractor()
         feats = np.asarray(cls.extractor(img_paths))
         norms = np.linalg.norm(feats, axis=1, keepdims=True)
@@ -37,8 +39,8 @@ class OSNet:
             groups[label].append(path)
         return groups, eps
 
-    @classmethod
-    def find_optimal_eps(cls, feats_norm, k=2):
+    @staticmethod
+    def find_optimal_eps(feats_norm, k=2):
         neigh = NearestNeighbors(n_neighbors=k+1, metric='euclidean') # n_neighbors:自分自身を含む何番目まで遠い距離を探すか（1はじまり） 自分自身を含むためk+1
         neigh.fit(feats_norm)
         distances, _ = neigh.kneighbors(feats_norm)
@@ -107,4 +109,53 @@ class OSNet:
                 cluster_id += 1
             
         return labels, final_components
+
+    @staticmethod
+    def compute_k_reciprocal_jaccard_distance(feats, k=5):
+        n_samples = len(feats) 
+        dist_mat = euclidean_distances(feats) 
+        # k近傍 (k-NN) のインデックスを取得
+        knn_indices = np.argsort(dist_mat, axis=1)[:, :k]
+        # 相互k近傍 (k-reciprocal neighbors) のセットを構築
+        k_reciprocal_sets = []
+        for i in range(n_samples):
+            forward_knn = knn_indices[i]
+            reciprocal_set = []
+            for j in forward_knn:
+                if i in knn_indices[j]: # i -> j だけでなく j -> i も成り立っていれば採用
+                    reciprocal_set.append(j)
+            k_reciprocal_sets.append(set(reciprocal_set))
+        
+        # Jaccard距離行列の計算
+        jaccard_dist_mat = np.zeros((n_samples, n_samples))
+        for i in range(n_samples):
+            for j in range(n_samples):
+                if i == j:
+                    jaccard_dist_mat[i, j] = 0.0
+                    continue
+                set_i = k_reciprocal_sets[i]
+                set_j = k_reciprocal_sets[j]
+                intersection = len(set_i.intersection(set_j)) # 共通の友達の数（積集合）
+                union = len(set_i.union(set_j)) # 全員の友達の数（和集合）
+                # Jaccard距離 = 1 - Jaccard係数
+                if union == 0:
+                    jaccard_dist_mat[i, j] = 1.0 # 共通の友達がいない場合は最大距離
+                else:
+                    jaccard_dist_mat[i, j] = 1.0 - (intersection / union)
+                
+        return jaccard_dist_mat       
+
+    @classmethod
+    def dbscan_by_k_reciprocal_jaccard(cls, img_paths, eps, min_samples=2, k=5):
+        cls._init_extractor()
+        feats = np.asarray(cls.extractor(img_paths))
+        dist_mat = cls.compute_k_reciprocal_jaccard_distance(feats, k=k)
+        cluster = DBSCAN(eps=eps, min_samples=min_samples, metric='precomputed')
+        labels = cluster.fit(dist_mat).labels_
+        groups = defaultdict(list)
+        for path, label in zip(img_paths, labels):
+            groups[label].append(path)
+        return groups
+
+
     
