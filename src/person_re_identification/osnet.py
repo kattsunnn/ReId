@@ -157,5 +157,42 @@ class OSNet:
             groups[label].append(path)
         return groups
 
-
-    
+    @classmethod
+    def find_top_n_similar_pairs(cls, img_paths, top_n=-1, similarity_threshold=0.8):
+        cls._init_extractor()
+        # 特徴抽出と正規化
+        feats = np.asarray(cls.extractor(img_paths))
+        norms = np.linalg.norm(feats, axis=1, keepdims=True)
+        norms = np.maximum(norms, 1e-12)
+        feats_normalized = feats / norms
+        # 全画像間の類似度行列 (コサイン類似度) を計算
+        sim_matrix = np.dot(feats_normalized, feats_normalized.T)
+        # 重複（i, j と j, i）と自己類似（i, i）を避けるため、上三角行列のインデックスを取得
+        # k=1 にすることで対角成分（自身との類似度）を除外
+        n_samples = len(img_paths)
+        triu_indices = np.triu_indices(n_samples, k=1)
+        # 上三角成分の類似度を取得
+        flat_similarities = sim_matrix[triu_indices]
+        
+        if top_n == -1:
+            if similarity_threshold is not None:
+                # 閾値以上のインデックスのみ抽出
+                candidate_indices = np.where(flat_similarities >= similarity_threshold)[0]
+                # 類似度の降順でソート
+                sorted_indices = candidate_indices[np.argsort(flat_similarities[candidate_indices])[::-1]]
+            else:
+                sorted_indices = np.argsort(flat_similarities)[::-1]
+        else:
+            # 指定された top_n が総ペア数を超えないように調整
+            actual_top_n = min(top_n, len(flat_similarities))
+            # 類似度が高い順（降順）にソートしたインデックスを取得
+            sorted_indices = np.argsort(flat_similarities)[::-1][:actual_top_n]
+        
+        # 対応する画像パスのペアと類似度を返却
+        top_pairs = []
+        for idx in sorted_indices:
+            i = triu_indices[0][idx]
+            j = triu_indices[1][idx]
+            top_pairs.append((img_paths[i], img_paths[j], float(flat_similarities[idx])))
+            
+        return top_pairs
